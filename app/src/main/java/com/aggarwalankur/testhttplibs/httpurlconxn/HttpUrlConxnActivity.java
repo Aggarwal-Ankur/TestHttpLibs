@@ -2,6 +2,7 @@ package com.aggarwalankur.testhttplibs.httpurlconxn;
 
 import android.app.FragmentManager;
 import android.net.Uri;
+import android.net.http.HttpResponseCache;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
@@ -9,6 +10,7 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
+import android.util.Log;
 import android.view.View;
 import android.widget.Toast;
 
@@ -19,12 +21,16 @@ import com.aggarwalankur.testhttplibs.okhttp.MovieFetchFragment;
 import com.aggarwalankur.testhttplibs.okhttp.OkHttpActivity;
 import com.aggarwalankur.testhttplibs.okhttp.OkHttpAdapter;
 
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 import static com.aggarwalankur.testhttplibs.BuildConfig.MOVIE_DB_API_KEY;
 
 public class HttpUrlConxnActivity extends AppCompatActivity implements MovieFetchWithHttpUrlConxnFragment.FetchCallbacks{
+
+    private static final String TAG = HttpUrlConxnActivity.class.getSimpleName();
 
     private static final String TAG_ASYNC_FRAGMENT = "async_fragment";
 
@@ -56,6 +62,14 @@ public class HttpUrlConxnActivity extends AppCompatActivity implements MovieFetc
 
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
 
+        try {
+            File httpCacheDir = new File(this.getCacheDir(), "http");
+            long httpCacheSize = 10 * 1024 * 1024; // 10 MiB
+            HttpResponseCache.install(httpCacheDir, httpCacheSize);
+        } catch (IOException e) {
+            Log.i(TAG, "HTTP response cache installation failed:" + e);
+        }
+
         FragmentManager fm = getFragmentManager();
         mFetchFragment = (MovieFetchWithHttpUrlConxnFragment) fm.findFragmentByTag(TAG_ASYNC_FRAGMENT);
 
@@ -84,8 +98,18 @@ public class HttpUrlConxnActivity extends AppCompatActivity implements MovieFetc
         rView.addItemDecoration(itemDecoration);
 
         requestStartTime = System.currentTimeMillis();
+
+
     }
 
+    @Override
+    protected void onStop() {
+        HttpResponseCache cache = HttpResponseCache.getInstalled();
+        if (cache != null) {
+            cache.flush();
+        }
+        super.onStop();
+    }
 
     private void fetchTopRatedMovies(){
         Uri.Builder uriBuilder = new Uri.Builder();
@@ -104,6 +128,9 @@ public class HttpUrlConxnActivity extends AppCompatActivity implements MovieFetc
 
     @Override
     public void onListFetchCompleted(List<MovieDataItem> movieDataItems) {
+        requestEndTime = System.currentTimeMillis();
+
+        Toast.makeText(HttpUrlConxnActivity.this, "Request took "+ (requestEndTime - requestStartTime) + " ms", Toast.LENGTH_SHORT).show();
         if(mDataItems == null){
             return;
         }
@@ -113,9 +140,7 @@ public class HttpUrlConxnActivity extends AppCompatActivity implements MovieFetc
             return;
         }
 
-        requestEndTime = System.currentTimeMillis();
 
-        Toast.makeText(HttpUrlConxnActivity.this, "Request took "+ (requestEndTime - requestStartTime) + " ms", Toast.LENGTH_SHORT).show();
 
         mDataItems.clear();
         mDataItems.addAll(movieDataItems);

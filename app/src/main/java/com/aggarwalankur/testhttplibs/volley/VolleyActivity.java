@@ -21,6 +21,7 @@ import com.aggarwalankur.testhttplibs.StackoverflowResponse;
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.Response;
+import com.android.volley.RetryPolicy;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.JsonRequest;
@@ -101,10 +102,40 @@ public class VolleyActivity extends AppCompatActivity implements Response.Listen
         //Required if we want to cancel the request. DO NOT use "this" as is given in many examples
         request.setTag(VolleyActivity.class);
 
+        request.setRetryPolicy(new RetryPolicy() {
+            private static final int MAX_RETRIES = 5;
+            private int mCurrentTimeoutMs = 10000;
+            private int mCurrentRetryCount = 0;
+
+            private static final int BACK_OFF_MULTIPLIER = 5;
+
+            @Override
+            public int getCurrentTimeout() {
+                return mCurrentTimeoutMs;
+            }
+
+            @Override
+            public int getCurrentRetryCount() {
+                return mCurrentRetryCount;
+            }
+
+            @Override
+            public void retry(VolleyError error) throws VolleyError {
+                mCurrentRetryCount++;
+
+                //Some custom retry logic
+                mCurrentTimeoutMs += (mCurrentTimeoutMs * BACK_OFF_MULTIPLIER);
+
+                if (mCurrentRetryCount > MAX_RETRIES) {
+                    throw error;
+                }
+            }
+        });
+        VolleyHelper.getInstance(this).addToRequestQueue(request);
+
         //Get a request queue and make a volley request
         requestStartTime = System.currentTimeMillis();
 
-        VolleyHelper.getInstance(this).addToRequestQueue(request);
     }
 
     @Override
